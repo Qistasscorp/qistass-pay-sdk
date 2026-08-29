@@ -1,0 +1,79 @@
+/**
+ * Qistass Pay — drop-in checkout button styling.
+ * Brand tokens match qistass-landing-v2.css (green #0D3B2E / gold #F2D94E).
+ * Scoped entirely under .qistass-pay-btn so it can't leak into / clash with
+ * the host site's own CSS.
+ */
+.qistass-pay-btn {
+  --qp-green: #0D3B2E;
+  --qp-green-light: #1F7A4D;
+  --qp-gold: #F2D94E;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 22px;
+  border: none;
+  border-radius: 12px;
+  background: var(--qp-green);
+  color: #fff;
+  font-family: 'IBM Plex Sans Arabic', system-ui, sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color .15s ease, transform .1s ease, opacity .15s ease;
+  width: 100%;
+  max-width: 360px;
+}
+
+.qistass-pay-btn:hover:not(:disabled) {
+  background: var(--qp-green-light);
+}
+
+.qistass-pay-btn:active:not(:disabled) {
+  transform: scale(.98);
+}
+
+.qistass-pay-btn:disabled {
+  opacity: .6;
+  cursor: default;
+}
+
+.qistass-pay-btn__logo {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  background: var(--qp-gold);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.qistass-pay-btn__logo svg {
+  width: 12px;
+  height: 12px;
+  stroke: var(--qp-green);
+}
+
+.qistass-pay-btn__spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, .35);
+  border-top-color: #fff;
+  animation: qistass-pay-spin .7s linear infinite;
+}
+
+@keyframes qistass-pay-spin {
+  to { transform: rotate(360deg); }
+}
+
+.qistass-pay-btn__error {
+  margin-top: 10px;
+  font-family: 'IBM Plex Sans Arabic', system-ui, sans-serif;
+  font-size: 13px;
+  color: #a13333;
+  max-width: 360px;
+}

@@ -1,0 +1,136 @@
+{
+  "info": {
+    "name": "Qistass Pay API",
+    "description": "طلبات جاهزة لاختبار API بوابة الدفع الخاصة بقسطاس باي (pay.qistass.com) مباشرة، دون كتابة أي كود. عبّئ متغيرات البيئة المرفقة (qistass-pay.postman_environment.json) بمفاتيحك الحقيقية قبل التجربة.\n\nالتوثيق الكامل: https://pay.qistass.com/developers/",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "https://pay.qistass.com" }
+  ],
+  "item": [
+    {
+      "name": "إنشاء طلب دفع",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"public_key\": \"{{public_key}}\",\n  \"secret_key\": \"{{secret_key}}\",\n  \"merchant_number\": \"{{merchant_number}}\",\n  \"amount\": 45000,\n  \"order_id\": \"ORD-DEMO-0001\",\n  \"webhook_url\": \"https://yoursite.com/webhook/qistass\",\n  \"callback_url\": \"https://yoursite.com/payment/return\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/create-payment-order",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "create-payment-order"]
+        },
+        "description": "قيمة \"amount\" تُحسب بعملة التاجر نفسه (المحددة في لوحة تحكمه على قسطاس باي)، وليست دائمًا بالليرة السورية.\n\n\"webhook_url\" و\"callback_url\" اختياريان."
+      },
+      "response": [
+        {
+          "name": "نجاح — تم إنشاء الطلب",
+          "originalRequest": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/create-payment-order" }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [{ "key": "Content-Type", "value": "application/json" }],
+          "body": "{\n  \"status\": \"payment_created\",\n  \"redirect_url\": \"https://pay.qistass.com/payment-process?payment_id=...\",\n  \"transaction_id\": \"a1b2c3d4-...\"\n}"
+        },
+        {
+          "name": "خطأ — تاجر غير موجود",
+          "originalRequest": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/create-payment-order" }
+          },
+          "status": "Bad Request",
+          "code": 400,
+          "_postman_previewlanguage": "json",
+          "header": [{ "key": "Content-Type", "value": "application/json" }],
+          "body": "{\n  \"status\": \"merchant_not_found\",\n  \"message\": \"...\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "التحقق من حالة الدفع",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"public_key\": \"{{public_key}}\",\n  \"secret_key\": \"{{secret_key}}\",\n  \"merchant_number\": \"{{merchant_number}}\",\n  \"transaction_id\": \"a1b2c3d4-...\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/payment-verification",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "payment-verification"]
+        },
+        "description": "يجب استدعاء هذا الطلب دائمًا من جانب الخادم قبل تفعيل أي طلب — لا يُعتمد على رابط العودة أو الـ webhook وحدهما، فكلاهما قابل للتزوير أو التكرار."
+      },
+      "response": [
+        {
+          "name": "نجاح — الدفع مؤكَّد",
+          "originalRequest": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/payment-verification" }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [{ "key": "Content-Type", "value": "application/json" }],
+          "body": "{\n  \"payment_record\": {\n    \"is_paid\": 1,\n    \"amount\": 45000,\n    \"transaction_id\": \"a1b2c3d4-...\"\n  }\n}"
+        },
+        {
+          "name": "غير موجود — لم يُعثر على العملية",
+          "originalRequest": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/payment-verification" }
+          },
+          "status": "Not Found",
+          "code": 404,
+          "_postman_previewlanguage": "json",
+          "header": [{ "key": "Content-Type", "value": "application/json" }],
+          "body": "{\n  \"errors\": \"Payment record not found\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "التحقق من توقيع الـ Webhook (مرجع)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"order_id\": \"ORD-DEMO-0001\",\n  \"transaction_id\": \"a1b2c3d4-...\",\n  \"status\": \"paid\",\n  \"amount\": 45000\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": { "raw": "https://yoursite.com/webhook/qistass", "host": ["yoursite.com"], "path": ["webhook", "qistass"] },
+        "description": "هذا الطلب لا يُرسَل فعليًا من هنا — الـ webhook حقيقةً يصلك من قسطاس باي على الرابط الذي حددته أنت (webhook_url). أُضيف هنا فقط كمرجع لشكل الحمولة (payload) وطريقة التحقق من التوقيع، عبر ترويسة X-Qistass-Signature (HMAC-SHA256 محسوبة على الجسم الخام للطلب باستخدام webhook_secret الخاص بك)."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// مثال حساب التوقيع محليًا للمقارنة اليدوية (ليس جزءًا من طلب حقيقي):",
+              "const CryptoJS = require('crypto-js');",
+              "const rawBody = pm.request.body.raw;",
+              "const secret = pm.environment.get('webhook_secret') || '';",
+              "const signature = CryptoJS.HmacSHA256(rawBody, secret).toString(CryptoJS.enc.Hex);",
+              "console.log('X-Qistass-Signature المتوقعة:', signature);"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

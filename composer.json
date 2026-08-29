@@ -1,0 +1,16 @@
+{
+    "name": "qistass/pay-sdk",
+    "description": "Official server-side PHP SDK for the Qistass Pay payment gateway (pay.qistass.com).",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": ">=7.4",
+        "ext-curl": "*",
+        "ext-json": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "QistassPay\\": "src/"
+        }
+    }
+}

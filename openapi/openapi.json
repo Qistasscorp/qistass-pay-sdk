@@ -1,0 +1,228 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Qistass Pay API",
+    "version": "1.0.0",
+    "description": "بوابة الدفع الإلكتروني لمنصة قسطاس باي. جميع الطلبات تُرسل كـ JSON عبر POST، وتتطلب المصادقة عبر public_key وsecret_key وmerchant_number ضمن جسم الطلب نفسه (وليس عبر ترويسات HTTP) — لذلك لا يُستخدم مخطط securitySchemes القياسي في هذه المواصفة، والحقول المطلوبة موثَّقة مباشرة ضمن كل مخطط طلب (requestBody schema). التوثيق الكامل: https://pay.qistass.com/developers/",
+    "contact": {
+      "name": "Qistass Pay",
+      "url": "https://pay.qistass.com/developers/"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://github.com/Qistasscorp/qistass-pay-sdk/blob/main/LICENSE"
+    }
+  },
+  "servers": [
+    { "url": "https://pay.qistass.com", "description": "الإنتاج" }
+  ],
+  "security": [],
+  "paths": {
+    "/api/v1/create-payment-order": {
+      "post": {
+        "summary": "إنشاء طلب دفع",
+        "description": "ينشئ طلب دفع جديدًا ويعيد رابطًا لتوجيه الزبون إليه لإتمام الدفع.",
+        "operationId": "createPaymentOrder",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreatePaymentOrderRequest" },
+              "example": {
+                "public_key": "pk_live_xxx",
+                "secret_key": "sk_live_xxx",
+                "merchant_number": "0988214389",
+                "amount": 45000,
+                "order_id": "ORD-2026-0142",
+                "webhook_url": "https://yoursite.com/webhook/qistass",
+                "callback_url": "https://yoursite.com/payment/return"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "تم إنشاء الطلب بنجاح",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CreatePaymentOrderSuccess" },
+                "example": {
+                  "status": "payment_created",
+                  "redirect_url": "https://pay.qistass.com/payment-process?payment_id=...",
+                  "transaction_id": "a1b2c3d4-..."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "طلب غير صالح — مثال: تاجر غير موجود أو غير موثَّق",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "examples": {
+                  "merchant_not_found": {
+                    "value": { "status": "merchant_not_found", "message": "..." }
+                  },
+                  "merchant_not_verified": {
+                    "value": { "status": "merchant_not_verified", "message": "..." }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "تجاوز الحد المسموح من الطلبات (300 طلب/دقيقة لكل تاجر)"
+          }
+        }
+      }
+    },
+    "/api/v1/payment-verification": {
+      "post": {
+        "summary": "التحقق من حالة الدفع",
+        "description": "يجب استدعاؤه دائمًا من جانب الخادم قبل تفعيل أي طلب — لا يُعتمد على رابط العودة أو الـ webhook وحدهما.",
+        "operationId": "verifyPayment",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/VerifyPaymentRequest" },
+              "example": {
+                "public_key": "pk_live_xxx",
+                "secret_key": "sk_live_xxx",
+                "merchant_number": "0988214389",
+                "transaction_id": "a1b2c3d4-..."
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "تم العثور على العملية",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/VerifyPaymentSuccess" },
+                "example": {
+                  "payment_record": {
+                    "is_paid": 1,
+                    "amount": 45000,
+                    "transaction_id": "a1b2c3d4-..."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "لم يُعثر على العملية — لاحظ اختلاف شكل هذا الخطأ عن أخطاء create-payment-order (مفتاح errors وليس status)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/NotFoundResponse" },
+                "example": { "errors": "Payment record not found" }
+              }
+            }
+          },
+          "429": {
+            "description": "تجاوز الحد المسموح من الطلبات (300 طلب/دقيقة لكل تاجر)"
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {
+    "paymentNotification": {
+      "post": {
+        "summary": "إشعار دفع (Webhook)",
+        "operationId": "paymentNotificationReceived",
+        "description": "يرسله قسطاس باي إلى الرابط الذي حددته في webhook_url عند اكتمال الدفع أو تغيّر حالته. تحقّق دائمًا من ترويسة X-Qistass-Signature قبل الوثوق بالمحتوى — التوقيع هو HMAC-SHA256 محسوبة على الجسم الخام للطلب باستخدام webhook_secret الخاص بك.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/WebhookPayload" },
+              "example": {
+                "order_id": "ORD-2026-0142",
+                "transaction_id": "a1b2c3d4-...",
+                "status": "paid",
+                "amount": 45000
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "استلام الإشعار (أي استجابة 2xx تكفي)" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CreatePaymentOrderRequest": {
+        "type": "object",
+        "required": ["public_key", "secret_key", "merchant_number", "amount", "order_id"],
+        "properties": {
+          "public_key": { "type": "string", "description": "المفتاح العام للتاجر" },
+          "secret_key": { "type": "string", "description": "المفتاح السري — يبقى على الخادم فقط، لا يوضع أبدًا في كود المتصفح" },
+          "merchant_number": { "type": "string" },
+          "amount": {
+            "type": "number",
+            "description": "المبلغ بعملة التاجر نفسه (المحددة في لوحة تحكمه)، وليس دائمًا بالليرة السورية"
+          },
+          "order_id": { "type": "string", "description": "معرّف الطلب في نظام التاجر" },
+          "webhook_url": { "type": "string", "format": "uri", "description": "اختياري — أين يُرسَل إشعار الدفع" },
+          "callback_url": { "type": "string", "format": "uri", "description": "اختياري — أين يُعاد توجيه الزبون بعد الدفع" }
+        }
+      },
+      "CreatePaymentOrderSuccess": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "enum": ["payment_created"] },
+          "redirect_url": { "type": "string", "format": "uri" },
+          "transaction_id": { "type": "string" }
+        }
+      },
+      "VerifyPaymentRequest": {
+        "type": "object",
+        "required": ["public_key", "secret_key", "merchant_number", "transaction_id"],
+        "properties": {
+          "public_key": { "type": "string" },
+          "secret_key": { "type": "string" },
+          "merchant_number": { "type": "string" },
+          "transaction_id": { "type": "string" }
+        }
+      },
+      "VerifyPaymentSuccess": {
+        "type": "object",
+        "properties": {
+          "payment_record": {
+            "type": "object",
+            "properties": {
+              "is_paid": { "type": "integer", "enum": [0, 1] },
+              "amount": { "type": "number" },
+              "transaction_id": { "type": "string" }
+            }
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "رمز الخطأ الحرفي، مثل merchant_not_found" },
+          "message": { "type": "string" }
+        }
+      },
+      "NotFoundResponse": {
+        "type": "object",
+        "properties": {
+          "errors": { "type": "string" }
+        }
+      },
+      "WebhookPayload": {
+        "type": "object",
+        "properties": {
+          "order_id": { "type": "string" },
+          "transaction_id": { "type": "string" },
+          "status": { "type": "string" },
+          "amount": { "type": "number" }
+        }
+      }
+    }
+  }
+}
