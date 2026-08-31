@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Qistass Pay API",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "بوابة الدفع الإلكتروني لمنصة قسطاس باي. جميع الطلبات تُرسل كـ JSON عبر POST، وتتطلب المصادقة عبر public_key وsecret_key وmerchant_number ضمن جسم الطلب نفسه (وليس عبر ترويسات HTTP) — لذلك لا يُستخدم مخطط securitySchemes القياسي في هذه المواصفة، والحقول المطلوبة موثَّقة مباشرة ضمن كل مخطط طلب (requestBody schema). التوثيق الكامل: https://pay.qistass.com/developers/",
     "contact": {
       "name": "Qistass Pay",
@@ -125,6 +125,134 @@
           }
         }
       }
+    },
+    "/api/v1/create-subscription": {
+      "post": {
+        "summary": "إنشاء اشتراك (فوترة متكررة)",
+        "description": "دورة شهرية ثابتة، بعملة التاجر نفسه. الرابط الناتج يوجّه الزبون لتفويض واحد عبر تدفق PIN المعروف — لا واجهة جديدة. كل شحنة تالية تلقائية بالكامل عبر أحداث webhook (subscription.*), بلا إعادة طلب PIN.",
+        "operationId": "createSubscription",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateSubscriptionRequest" },
+              "example": {
+                "public_key": "pk_live_xxx",
+                "secret_key": "sk_live_xxx",
+                "merchant_number": "0988214389",
+                "amount": 9990,
+                "subscription_id": "user_42",
+                "webhook_url": "https://yoursite.com/webhook/qistass-subscription",
+                "callback_url": "https://yoursite.com/account?subscribed=1"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "تم إنشاء الاشتراك بنجاح",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CreateSubscriptionSuccess" },
+                "example": {
+                  "status": "subscription_created",
+                  "subscription_id": "6f94ba33-...",
+                  "redirect_url": "https://pay.qistass.com/payment-process?payment_id=..."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "subscription_id مستخدم أصلًا لاشتراك لم يُلغَ",
+            "content": {
+              "application/json": {
+                "example": { "status": "duplicate_subscription_id", "subscription_id": "6f94ba33-..." }
+              }
+            }
+          },
+          "429": {
+            "description": "تجاوز الحد المسموح من الطلبات (60 طلب/دقيقة لكل تاجر)"
+          }
+        }
+      }
+    },
+    "/api/v1/subscription-status": {
+      "post": {
+        "summary": "حالة الاشتراك",
+        "description": "يقبل إما subscription_id الذي أعادته قسطاس باي، أو الذي أرسله التاجر أصلًا عند الإنشاء.",
+        "operationId": "getSubscriptionStatus",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SubscriptionIdRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "تم العثور على الاشتراك",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SubscriptionStatusSuccess" },
+                "example": {
+                  "subscription": {
+                    "id": "6f94ba33-...",
+                    "status": "active",
+                    "amount": 9990,
+                    "currency_id": 1,
+                    "interval": "monthly",
+                    "next_billing_at": "2026-09-29T18:08:22+03:00",
+                    "failed_attempts": 0
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "لم يُعثر على الاشتراك",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/NotFoundResponse" },
+                "example": { "errors": "Subscription not found" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/cancel-subscription": {
+      "post": {
+        "summary": "إلغاء الاشتراك",
+        "description": "إلغاء فوري ونهائي — بلا شحن لاحق. Idempotent. الزبون قادر يلغي اشتراكه بنفسه أيضًا من طرفه، مستقلًا عن هذا الطلب — لا يعتمد على تعاون التاجر.",
+        "operationId": "cancelSubscription",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SubscriptionIdRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "أُلغي (أو كان ملغى أصلًا)",
+            "content": {
+              "application/json": {
+                "example": { "status": "canceled" }
+              }
+            }
+          },
+          "404": {
+            "description": "لم يُعثر على الاشتراك",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/NotFoundResponse" }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "webhooks": {
@@ -142,6 +270,31 @@
                 "transaction_id": "a1b2c3d4-...",
                 "status": "paid",
                 "amount": 45000
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "استلام الإشعار (أي استجابة 2xx تكفي)" }
+        }
+      }
+    },
+    "subscriptionNotification": {
+      "post": {
+        "summary": "إشعار حالة اشتراك (Webhook)",
+        "operationId": "subscriptionNotificationReceived",
+        "description": "يرسله قسطاس باي عند تفويض أول ناجح، تجديد شهري ناجح، فشل تجديد، أو إلغاء. نفس مخطط التوقيع (X-Qistass-Signature) المستخدم لإشعارات الدفعة الواحدة. هذا هو المصدر الوحيد الموثوق لفتح/إغلاق الميزات المدفوعة — وليس رابط العودة (callback_url)، الذي هو لتجربة المستخدم فقط.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SubscriptionWebhookPayload" },
+              "example": {
+                "event": "subscription.charged",
+                "subscription_id": "6f94ba33-...",
+                "merchant_subscription_id": "user_42",
+                "status": "active",
+                "transaction_id": "a1b2c3d4-...",
+                "amount": 9990
               }
             }
           }
@@ -221,6 +374,67 @@
           "transaction_id": { "type": "string" },
           "status": { "type": "string" },
           "amount": { "type": "number" }
+        }
+      },
+      "CreateSubscriptionRequest": {
+        "type": "object",
+        "required": ["public_key", "secret_key", "merchant_number", "amount", "subscription_id"],
+        "properties": {
+          "public_key": { "type": "string" },
+          "secret_key": { "type": "string" },
+          "merchant_number": { "type": "string" },
+          "amount": { "type": "number", "description": "المبلغ الشهري، بعملة التاجر نفسه" },
+          "subscription_id": { "type": "string", "description": "مرجع التاجر الخاص — يُستخدم لاحقًا لربط أحداث webhook بحساب الزبون عند التاجر" },
+          "interval": { "type": "string", "enum": ["monthly"], "description": "اختياري، monthly هي القيمة الوحيدة المدعومة حاليًا" },
+          "webhook_url": { "type": "string", "format": "uri" },
+          "callback_url": { "type": "string", "format": "uri" }
+        }
+      },
+      "CreateSubscriptionSuccess": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "enum": ["subscription_created"] },
+          "subscription_id": { "type": "string" },
+          "redirect_url": { "type": "string", "format": "uri" }
+        }
+      },
+      "SubscriptionIdRequest": {
+        "type": "object",
+        "required": ["public_key", "secret_key", "merchant_number", "subscription_id"],
+        "properties": {
+          "public_key": { "type": "string" },
+          "secret_key": { "type": "string" },
+          "merchant_number": { "type": "string" },
+          "subscription_id": { "type": "string" }
+        }
+      },
+      "SubscriptionStatusSuccess": {
+        "type": "object",
+        "properties": {
+          "subscription": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "status": { "type": "string", "enum": ["pending", "active", "past_due", "canceled"] },
+              "amount": { "type": "number" },
+              "currency_id": { "type": "integer" },
+              "interval": { "type": "string" },
+              "next_billing_at": { "type": "string", "format": "date-time" },
+              "failed_attempts": { "type": "integer" }
+            }
+          }
+        }
+      },
+      "SubscriptionWebhookPayload": {
+        "type": "object",
+        "properties": {
+          "event": { "type": "string", "enum": ["subscription.charged", "subscription.payment_failed", "subscription.canceled"] },
+          "subscription_id": { "type": "string" },
+          "merchant_subscription_id": { "type": "string" },
+          "status": { "type": "string" },
+          "transaction_id": { "type": "string", "description": "موجود فقط في subscription.charged" },
+          "amount": { "type": "number" },
+          "reason": { "type": "string", "description": "موجود في subscription.payment_failed و subscription.canceled" }
         }
       }
     }

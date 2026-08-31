@@ -18,7 +18,7 @@ src/QistassPayException.php        استثناء للأخطاء المنطقي�
 src/QistassPayNetworkException.php استثناء لأخطاء الشبكة والاتصال
 assets/qistass-button.js           زر دفع جاهز (Vanilla JS، دون اعتماديات)
 assets/qistass-button.css          تنسيق الزر بهوية قسطاس (أخضر/ذهبي)
-examples/                          مثال تكامل كامل وفعّال (3 خطوات)
+examples/                          أمثلة تكامل كاملة وفعّالة — دفعة واحدة واشتراكات
 ```
 
 ## التثبيت
@@ -100,7 +100,41 @@ if ($qistass->isPaid($transactionId, expectedAmount: 45000)) {
 
 راجع مجلد `examples/` للاطلاع على مثال كامل وفعّال: `index.html` (الزر) + `create-checkout.php` + `webhook.php` + `return.php`.
 
+## الاشتراكات (فوترة متكررة — مناسبة لمشاريع SaaS)
+
+بدل دفعة واحدة، أنشئ تفويضًا شهريًا يُشحن تلقائيًا كل شهر من غير أي تدخل منك بعد التفويض الأول:
+
+```php
+$result = $qistass->createSubscription(
+    9990,              // المبلغ الشهري، بعملة استقبالك
+    'user_42',         // معرّفك الخاص — استخدم شيء يربطك بحساب الزبون عندك (id المستخدم مثلًا)
+    'https://yoursite.com/qistass/subscription-webhook.php',
+    'https://yoursite.com/account?subscribed=1'
+);
+
+header('Location: ' . $result['redirect_url']); // نفس تدفق PIN المعروف — بلا واجهة جديدة من طرفك
+```
+
+**كيف تنفتح الميزات المدفوعة فعليًا عند الزبون؟** عبر الـ webhook فقط، وليس رابط العودة:
+
+| الحدث | يعني |
+|---|---|
+| `subscription.charged` | تفويض ناجح أو تجديد شهري ناجح — فعّل/جدّد الميزة |
+| `subscription.payment_failed` | فشل تجديد (رصيد غير كافٍ) — الاشتراك ما زال حيًا، إعادة محاولة تلقائية بعد يومين |
+| `subscription.canceled` | لا شحن بعد الآن (سواء ألغاه التاجر، أو الزبون بنفسه، أو فشلتين متتاليتين) — عطّل الميزة |
+
+```php
+$qistass->subscriptionStatus($subscriptionId);  // تحقق من الحالة الحالية يدويًا في أي وقت
+$qistass->cancelSubscription($subscriptionId);  // إلغاء فوري، بلا شحن لاحق
+```
+
+⚠️ **رابط العودة (`callback_url`) لتجربة المستخدم فقط** — لا يجب أبدًا أن يكون هو المصدر يلي يفعّل الميزة، لأنو ممكن الزبون يسكّر المتصفح قبل ما يوصل، أو يُزوَّر من طرف العميل. الـ webhook (موقَّع ومُتحقَّق منه من طرف السيرفر) هو المصدر الوحيد الموثوق.
+
+مثال كامل شغّال: `examples/subscribe.php` + `examples/subscription-webhook.php`.
+
 ## التحقق من توقيع الـ Webhook
+
+نفس آلية التحقق تنطبق على إشعارات الدفعة الواحدة وإشعارات الاشتراكات معًا:
 
 ```php
 $payload = $qistass->handleIncomingWebhook(); // يتحقق من X-Qistass-Signature تلقائيًا

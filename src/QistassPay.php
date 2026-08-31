@@ -141,6 +141,101 @@ class QistassPay
     }
 
     /**
+     * Create a recurring monthly subscription and get back the URL to send
+     * your customer to for one-time authorization (the normal phone/otp/pin
+     * flow — no separate subscription UI on your side). Every charge after
+     * that is fully automatic; you are notified via the subscription.*
+     * webhook events, not by polling.
+     *
+     * $subscriptionId should be something YOU can map back to your own
+     * user/account (e.g. your own internal user id) — it is what
+     * identifies which of your customers a later webhook event belongs to.
+     *
+     * @return array{status:string, subscription_id:string, redirect_url:string}
+     * @throws QistassPayException on merchant errors, or status
+     *         duplicate_subscription_id if this subscription_id already
+     *         has an active/pending subscription (the existing one's id is
+     *         returned in the exception's response payload — see
+     *         $e->response).
+     * @throws QistassPayNetworkException on a transport-level failure.
+     */
+    public function createSubscription(
+        float $amount,
+        string $subscriptionId,
+        ?string $webhookUrl = null,
+        ?string $callbackUrl = null
+    ): array {
+        $payload = [
+            'public_key' => $this->publicKey,
+            'secret_key' => $this->secretKey,
+            'merchant_number' => $this->merchantNumber,
+            'amount' => $amount,
+            'subscription_id' => $subscriptionId,
+        ];
+
+        if ($webhookUrl !== null) {
+            $payload['webhook_url'] = $webhookUrl;
+        }
+        if ($callbackUrl !== null) {
+            $payload['callback_url'] = $callbackUrl;
+        }
+
+        $response = $this->post('/api/v1/create-subscription', $payload);
+
+        if (($response['status'] ?? null) !== 'subscription_created' || empty($response['redirect_url'])) {
+            throw new QistassPayException(
+                $response['status'] ?? 'unknown_error',
+                $response['message'] ?? 'Qistass Pay did not return a redirect_url.',
+                $response
+            );
+        }
+
+        return $response;
+    }
+
+    /**
+     * Look up a subscription's current status directly with Qistass Pay.
+     * Accepts either the subscription_id Qistass Pay generated, or the
+     * subscription_id you originally passed to createSubscription().
+     *
+     * @return array{id?:string, status?:string, amount?:float, currency_id?:int, interval?:string, next_billing_at?:string, failed_attempts?:int} Empty array if not found.
+     */
+    public function subscriptionStatus(string $subscriptionId): array
+    {
+        $response = $this->post('/api/v1/subscription-status', [
+            'public_key' => $this->publicKey,
+            'secret_key' => $this->secretKey,
+            'merchant_number' => $this->merchantNumber,
+            'subscription_id' => $subscriptionId,
+        ]);
+
+        return $response['subscription'] ?? [];
+    }
+
+    /**
+     * Cancel a subscription. Stops all future charges — the customer is
+     * never charged again after this call succeeds. Idempotent: canceling
+     * an already-canceled subscription returns 'already_canceled' rather
+     * than an error.
+     *
+     * Note: the customer can also cancel this themselves from their own
+     * side (Qistass Pay always gives them that right, independent of
+     * this API) — your webhook handler should treat subscription.canceled
+     * as authoritative regardless of who triggered it.
+     */
+    public function cancelSubscription(string $subscriptionId): string
+    {
+        $response = $this->post('/api/v1/cancel-subscription', [
+            'public_key' => $this->publicKey,
+            'secret_key' => $this->secretKey,
+            'merchant_number' => $this->merchantNumber,
+            'subscription_id' => $subscriptionId,
+        ]);
+
+        return $response['status'] ?? 'unknown';
+    }
+
+    /**
      * Verify the X-Qistass-Signature header on an inbound webhook request.
      * Pass the RAW, unparsed request body — signing is computed over the
      * exact bytes Qistass Pay sent, not a re-serialized version of it.

@@ -103,6 +103,111 @@
       ]
     },
     {
+      "name": "إنشاء اشتراك (فوترة متكررة)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"public_key\": \"{{public_key}}\",\n  \"secret_key\": \"{{secret_key}}\",\n  \"merchant_number\": \"{{merchant_number}}\",\n  \"amount\": 9990,\n  \"subscription_id\": \"user_42\",\n  \"webhook_url\": \"https://yoursite.com/webhook/qistass-subscription\",\n  \"callback_url\": \"https://yoursite.com/account?subscribed=1\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/create-subscription",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "create-subscription"]
+        },
+        "description": "دورة شهرية ثابتة، بعملة التاجر نفسه. \"subscription_id\" هو مرجعك الخاص (مثلًا معرّف المستخدم عندك) — يُستخدم لاحقًا بأحداث الـ webhook لتحديد أي زبون عندك يخصّه الحدث.\n\nالرابط الناتج (redirect_url) هو نفس تدفق تأكيد PIN المعروف — لا واجهة جديدة، ولا شحن فعلي حتى يأكّد الزبون بنفسه."
+      },
+      "response": [
+        {
+          "name": "نجاح — تم إنشاء الاشتراك",
+          "originalRequest": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/create-subscription" } },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [{ "key": "Content-Type", "value": "application/json" }],
+          "body": "{\n  \"status\": \"subscription_created\",\n  \"subscription_id\": \"6f94ba33-...\",\n  \"redirect_url\": \"https://pay.qistass.com/payment-process?payment_id=...\"\n}"
+        },
+        {
+          "name": "تكرار — subscription_id مستخدم أصلًا",
+          "originalRequest": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/create-subscription" } },
+          "status": "Conflict",
+          "code": 409,
+          "_postman_previewlanguage": "json",
+          "header": [{ "key": "Content-Type", "value": "application/json" }],
+          "body": "{\n  \"status\": \"duplicate_subscription_id\",\n  \"subscription_id\": \"6f94ba33-...\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "حالة الاشتراك",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"public_key\": \"{{public_key}}\",\n  \"secret_key\": \"{{secret_key}}\",\n  \"merchant_number\": \"{{merchant_number}}\",\n  \"subscription_id\": \"user_42\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/subscription-status",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "subscription-status"]
+        },
+        "description": "يقبل إما subscription_id الذي أعادته قسطاس باي، أو subscription_id الذي أرسلته أنت أصلًا عند الإنشاء."
+      },
+      "response": [
+        {
+          "name": "نجاح",
+          "originalRequest": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/subscription-status" } },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [{ "key": "Content-Type", "value": "application/json" }],
+          "body": "{\n  \"subscription\": {\n    \"id\": \"6f94ba33-...\",\n    \"status\": \"active\",\n    \"amount\": 9990,\n    \"currency_id\": 1,\n    \"interval\": \"monthly\",\n    \"next_billing_at\": \"2026-09-29T18:08:22+03:00\",\n    \"failed_attempts\": 0\n  }\n}"
+        }
+      ]
+    },
+    {
+      "name": "إلغاء الاشتراك",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"public_key\": \"{{public_key}}\",\n  \"secret_key\": \"{{secret_key}}\",\n  \"merchant_number\": \"{{merchant_number}}\",\n  \"subscription_id\": \"user_42\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/cancel-subscription",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "cancel-subscription"]
+        },
+        "description": "إلغاء فوري ونهائي — بلا شحن لاحق. Idempotent: تكرار الإلغاء يرجّع already_canceled بدل خطأ. ملاحظة: الزبون قادر يلغي اشتراكه بنفسه أيضًا من طرفه، مستقلًا عن هذا الطلب."
+      },
+      "response": [
+        {
+          "name": "نجاح",
+          "originalRequest": { "method": "POST", "url": { "raw": "{{base_url}}/api/v1/cancel-subscription" } },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [{ "key": "Content-Type", "value": "application/json" }],
+          "body": "{\n  \"status\": \"canceled\"\n}"
+        }
+      ]
+    },
+    {
       "name": "التحقق من توقيع الـ Webhook (مرجع)",
       "request": {
         "method": "POST",
