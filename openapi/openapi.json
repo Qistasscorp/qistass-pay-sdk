@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Qistass Pay API",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "description": "بوابة الدفع الإلكتروني لمنصة قسطاس باي. جميع الطلبات تُرسل كـ JSON عبر POST، وتتطلب المصادقة عبر public_key وsecret_key وmerchant_number ضمن جسم الطلب نفسه (وليس عبر ترويسات HTTP) — لذلك لا يُستخدم مخطط securitySchemes القياسي في هذه المواصفة، والحقول المطلوبة موثَّقة مباشرة ضمن كل مخطط طلب (requestBody schema). التوثيق الكامل: https://pay.qistass.com/developers/",
     "contact": {
       "name": "Qistass Pay",
@@ -129,7 +129,7 @@
     "/api/v1/create-subscription": {
       "post": {
         "summary": "إنشاء اشتراك (فوترة متكررة)",
-        "description": "دورة شهرية ثابتة، بعملة التاجر نفسه. الرابط الناتج يوجّه الزبون لتفويض واحد عبر تدفق PIN المعروف — لا واجهة جديدة. كل شحنة تالية تلقائية بالكامل عبر أحداث webhook (subscription.*), بلا إعادة طلب PIN.",
+        "description": "دورة ثابتة (weekly/monthly/yearly)، بعملة التاجر نفسه، مع فترة تجريبية اختيارية (trial_days، حتى 60 يومًا — بلا خصم حتى تنتهي). الرابط الناتج يوجّه الزبون لتفويض واحد عبر تدفق PIN المعروف — لا واجهة جديدة. كل شحنة تالية (بما فيها أول شحنة فعلية بعد انتهاء الفترة التجريبية إن وُجدت) تلقائية بالكامل عبر أحداث webhook (subscription.*), بلا إعادة طلب PIN.",
         "operationId": "createSubscription",
         "requestBody": {
           "required": true,
@@ -142,6 +142,8 @@
                 "merchant_number": "0988214389",
                 "amount": 9990,
                 "subscription_id": "user_42",
+                "interval": "monthly",
+                "trial_days": 7,
                 "webhook_url": "https://yoursite.com/webhook/qistass-subscription",
                 "callback_url": "https://yoursite.com/account?subscribed=1"
               }
@@ -202,6 +204,7 @@
                     "amount": 9990,
                     "currency_id": 1,
                     "interval": "monthly",
+                    "trial_days": 0,
                     "next_billing_at": "2026-09-29T18:08:22+03:00",
                     "failed_attempts": 0
                   }
@@ -383,9 +386,10 @@
           "public_key": { "type": "string" },
           "secret_key": { "type": "string" },
           "merchant_number": { "type": "string" },
-          "amount": { "type": "number", "description": "المبلغ الشهري، بعملة التاجر نفسه" },
+          "amount": { "type": "number", "description": "المبلغ لكل دورة، بعملة التاجر نفسه" },
           "subscription_id": { "type": "string", "description": "مرجع التاجر الخاص — يُستخدم لاحقًا لربط أحداث webhook بحساب الزبون عند التاجر" },
-          "interval": { "type": "string", "enum": ["monthly"], "description": "اختياري، monthly هي القيمة الوحيدة المدعومة حاليًا" },
+          "interval": { "type": "string", "enum": ["weekly", "monthly", "yearly"], "description": "اختياري، monthly افتراضيًا" },
+          "trial_days": { "type": "integer", "minimum": 0, "maximum": 60, "description": "اختياري، 0 افتراضيًا (بلا فترة تجريبية). عندما يكون أكبر من صفر، تفويض الزبون لا يخصم شيئًا — أول خصم فعلي يصير تلقائيًا بعد انتهاء الفترة" },
           "webhook_url": { "type": "string", "format": "uri" },
           "callback_url": { "type": "string", "format": "uri" }
         }
@@ -415,10 +419,11 @@
             "type": "object",
             "properties": {
               "id": { "type": "string" },
-              "status": { "type": "string", "enum": ["pending", "active", "past_due", "canceled"] },
+              "status": { "type": "string", "enum": ["pending", "trialing", "active", "past_due", "canceled"] },
               "amount": { "type": "number" },
               "currency_id": { "type": "integer" },
-              "interval": { "type": "string" },
+              "interval": { "type": "string", "enum": ["weekly", "monthly", "yearly"] },
+              "trial_days": { "type": "integer" },
               "next_billing_at": { "type": "string", "format": "date-time" },
               "failed_attempts": { "type": "integer" }
             }

@@ -1,14 +1,20 @@
 <?php
 /**
- * Example: start a recurring monthly subscription for a logged-in user of
- * YOUR OWN site (a SaaS app, a membership site — anything with recurring
- * billing). Call this from your own "Subscribe to Pro" button.
+ * Example: start a recurring subscription for a logged-in user of YOUR OWN
+ * site (a SaaS app, a membership site — anything with recurring billing).
+ * Call this from your own "Subscribe to Pro" button.
  *
  * subscription_id is set to your own internal user id — this is the field
  * that lets subscription-webhook.php later figure out *which of your
  * users* a webhook event is about. Use whatever identifier makes sense on
  * your side (user id, a "user_id:plan_id" composite, etc.) — Qistass Pay
  * just stores and echoes it back verbatim.
+ *
+ * interval: 'weekly' | 'monthly' | 'yearly'.
+ * trialDays: 0 (no trial, charge on authorization — the default below) up
+ * to 60. With a trial, authorization charges nothing; the first real
+ * charge happens automatically once the trial ends, and you're notified
+ * the same way as any renewal — via subscription.charged.
  */
 
 require __DIR__ . '/../src/QistassPay.php';
@@ -29,13 +35,16 @@ $qistass = new QistassPay(
 // In a real app this comes from your own session/auth, not a hardcoded value.
 $currentUserId = 'user_42';
 $monthlyPrice = 9990; // in your settlement currency, e.g. SYP
+$trialDays = 7; // e.g. a 7-day free trial — pass 0 for "charge immediately, no trial"
 
 try {
     $result = $qistass->createSubscription(
         $monthlyPrice,
         $currentUserId,
         'https://yoursite.com/qistass/subscription-webhook.php',
-        'https://yoursite.com/account?subscribed=1'
+        'https://yoursite.com/account?subscribed=1',
+        'monthly',
+        $trialDays
     );
 
     // Send the customer to authorize (redirect, or open in the popup

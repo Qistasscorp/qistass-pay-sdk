@@ -112,7 +112,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"public_key\": \"{{public_key}}\",\n  \"secret_key\": \"{{secret_key}}\",\n  \"merchant_number\": \"{{merchant_number}}\",\n  \"amount\": 9990,\n  \"subscription_id\": \"user_42\",\n  \"webhook_url\": \"https://yoursite.com/webhook/qistass-subscription\",\n  \"callback_url\": \"https://yoursite.com/account?subscribed=1\"\n}",
+          "raw": "{\n  \"public_key\": \"{{public_key}}\",\n  \"secret_key\": \"{{secret_key}}\",\n  \"merchant_number\": \"{{merchant_number}}\",\n  \"amount\": 9990,\n  \"subscription_id\": \"user_42\",\n  \"interval\": \"monthly\",\n  \"trial_days\": 0,\n  \"webhook_url\": \"https://yoursite.com/webhook/qistass-subscription\",\n  \"callback_url\": \"https://yoursite.com/account?subscribed=1\"\n}",
           "options": { "raw": { "language": "json" } }
         },
         "url": {
@@ -120,7 +120,7 @@
           "host": ["{{base_url}}"],
           "path": ["api", "v1", "create-subscription"]
         },
-        "description": "دورة شهرية ثابتة، بعملة التاجر نفسه. \"subscription_id\" هو مرجعك الخاص (مثلًا معرّف المستخدم عندك) — يُستخدم لاحقًا بأحداث الـ webhook لتحديد أي زبون عندك يخصّه الحدث.\n\nالرابط الناتج (redirect_url) هو نفس تدفق تأكيد PIN المعروف — لا واجهة جديدة، ولا شحن فعلي حتى يأكّد الزبون بنفسه."
+        "description": "دورة ثابتة (interval: weekly أو monthly أو yearly، الافتراضي monthly)، بعملة التاجر نفسه. \"subscription_id\" هو مرجعك الخاص (مثلًا معرّف المستخدم عندك) — يُستخدم لاحقًا بأحداث الـ webhook لتحديد أي زبون عندك يخصّه الحدث.\n\n\"trial_days\" اختياري (0 إلى 60، الافتراضي 0). عندما يكون أكبر من صفر، تفويض الزبون لا يخصم شيئًا — أول خصم فعلي يصير تلقائيًا بعد انتهاء الفترة التجريبية.\n\nالرابط الناتج (redirect_url) هو نفس تدفق تأكيد PIN المعروف — لا واجهة جديدة، ولا شحن فعلي حتى يأكّد الزبون بنفسه (أو حتى تنتهي الفترة التجريبية، إن وُجدت)."
       },
       "response": [
         {
@@ -171,7 +171,7 @@
           "code": 200,
           "_postman_previewlanguage": "json",
           "header": [{ "key": "Content-Type", "value": "application/json" }],
-          "body": "{\n  \"subscription\": {\n    \"id\": \"6f94ba33-...\",\n    \"status\": \"active\",\n    \"amount\": 9990,\n    \"currency_id\": 1,\n    \"interval\": \"monthly\",\n    \"next_billing_at\": \"2026-09-29T18:08:22+03:00\",\n    \"failed_attempts\": 0\n  }\n}"
+          "body": "{\n  \"subscription\": {\n    \"id\": \"6f94ba33-...\",\n    \"status\": \"active\",\n    \"amount\": 9990,\n    \"currency_id\": 1,\n    \"interval\": \"monthly\",\n    \"trial_days\": 0,\n    \"next_billing_at\": \"2026-09-29T18:08:22+03:00\",\n    \"failed_attempts\": 0\n  }\n}"
         }
       ]
     },

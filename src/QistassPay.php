@@ -141,8 +141,8 @@ class QistassPay
     }
 
     /**
-     * Create a recurring monthly subscription and get back the URL to send
-     * your customer to for one-time authorization (the normal phone/otp/pin
+     * Create a recurring subscription and get back the URL to send your
+     * customer to for one-time authorization (the normal phone/otp/pin
      * flow — no separate subscription UI on your side). Every charge after
      * that is fully automatic; you are notified via the subscription.*
      * webhook events, not by polling.
@@ -150,6 +150,16 @@ class QistassPay
      * $subscriptionId should be something YOU can map back to your own
      * user/account (e.g. your own internal user id) — it is what
      * identifies which of your customers a later webhook event belongs to.
+     *
+     * $interval: 'weekly', 'monthly' (default), or 'yearly'.
+     *
+     * $trialDays: 0 (default, no trial) up to 60. When > 0, the customer's
+     * one-time authorization charges nothing — they still confirm via a
+     * real PIN (genuine consent), but the actual first charge happens
+     * automatically once the trial ends, exactly like any other recurring
+     * charge. You'll get a subscription.charged webhook for that first
+     * real charge the same way you would for any renewal; there is no
+     * separate "trial ended" event to listen for.
      *
      * @return array{status:string, subscription_id:string, redirect_url:string}
      * @throws QistassPayException on merchant errors, or status
@@ -163,7 +173,9 @@ class QistassPay
         float $amount,
         string $subscriptionId,
         ?string $webhookUrl = null,
-        ?string $callbackUrl = null
+        ?string $callbackUrl = null,
+        string $interval = 'monthly',
+        int $trialDays = 0
     ): array {
         $payload = [
             'public_key' => $this->publicKey,
@@ -171,6 +183,8 @@ class QistassPay
             'merchant_number' => $this->merchantNumber,
             'amount' => $amount,
             'subscription_id' => $subscriptionId,
+            'interval' => $interval,
+            'trial_days' => $trialDays,
         ];
 
         if ($webhookUrl !== null) {
@@ -198,7 +212,7 @@ class QistassPay
      * Accepts either the subscription_id Qistass Pay generated, or the
      * subscription_id you originally passed to createSubscription().
      *
-     * @return array{id?:string, status?:string, amount?:float, currency_id?:int, interval?:string, next_billing_at?:string, failed_attempts?:int} Empty array if not found.
+     * @return array{id?:string, status?:string, amount?:float, currency_id?:int, interval?:string, trial_days?:int, next_billing_at?:string, failed_attempts?:int} Empty array if not found.
      */
     public function subscriptionStatus(string $subscriptionId): array
     {
